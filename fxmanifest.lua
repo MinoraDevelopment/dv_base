@@ -3,11 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 author 'ian.trm'
-version '1.0.0'
+description 'DV Basesystem - In Entwicklung'
+version '1.0b'
 
 shared_scripts {
     '@ox_lib/init.lua',
-    'config.lua'
+    'shared/config.lua',     -- NEU: Im shared Ordner
+    'shared/structures.lua'  -- NEU: Im shared Ordner
 }
 
 client_scripts {
