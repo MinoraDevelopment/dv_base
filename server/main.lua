@@ -69,7 +69,7 @@ CreateThread(function()
             `identifier` VARCHAR(64) NOT NULL,
             `item_name` VARCHAR(50) NOT NULL,
             `coords` LONGTEXT NOT NULL,
-            `heading` DECIMAL(6,2) NOT NULL DEFAULT 0, -- GEÄNDERT: Speichert genaue Kommazahlen
+            `heading` DECIMAL(6,2) NOT NULL DEFAULT 0,
             `hp` INT NOT NULL DEFAULT 100,
             `allowed_citizens` LONGTEXT NULL,
             `code` VARCHAR(10) NULL,
@@ -77,7 +77,6 @@ CreateThread(function()
         )
     ]])
     
-    -- Sicherstellen, dass die Spalten exakt so existieren (falls Tabelle schon alt war)
     MySQL.query.await("ALTER TABLE " .. Config.DbTable .. " ADD COLUMN IF NOT EXISTS `code` VARCHAR(10) NULL;")
     MySQL.query.await("ALTER TABLE " .. Config.DbTable .. " MODIFY COLUMN `heading` DECIMAL(6,2) NOT NULL DEFAULT 0;")
 
@@ -89,7 +88,7 @@ CreateThread(function()
             identifier       = row.identifier,
             item_name        = row.item_name,
             coords           = vector3(coordsData.x, coordsData.y, coordsData.z),
-            heading          = tonumber(row.heading), -- Sicherstellen, dass es eine Zahl ist
+            heading          = tonumber(row.heading),
             hp               = row.hp,
             allowed_citizens = row.allowed_citizens and json.decode(row.allowed_citizens) or {},
             code             = row.code,

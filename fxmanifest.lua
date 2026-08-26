@@ -8,8 +8,8 @@ version '1.0b'
 
 shared_scripts {
     '@ox_lib/init.lua',
-    'shared/config.lua',     -- NEU: Im shared Ordner
-    'shared/structures.lua'  -- NEU: Im shared Ordner
+    'shared/config.lua',
+    'shared/structures.lua'
 }
 
 client_scripts {

@@ -57,10 +57,7 @@ end
 
 local function LoadModel(model)
     local hash = type(model) == 'string' and joaat(model) or model
-    if not IsModelValid(hash) then 
-        print('[dv_base] FEHLER: Modell ist ungültig: ' .. tostring(model))
-        return nil 
-    end
+    if not IsModelValid(hash) then return nil end
     lib.requestModel(hash, 1000)
     return hash
 end
@@ -78,10 +75,7 @@ local function StartPlacement(itemKey)
     if isPlacing then return end
     
     local structDef = Config.Structures[itemKey]
-    if not structDef then
-        print('[dv_base] FEHLER: Struktur-Key nicht gefunden: ' .. tostring(itemKey))
-        return
-    end
+    if not structDef then return end
 
     local hash = LoadModel(structDef.model)
     if not hash then
@@ -95,8 +89,6 @@ local function StartPlacement(itemKey)
     SetEntityAlpha(previewEntity, 200, false)
     SetEntityCollision(previewEntity, false, false)
     SetEntityVisible(previewEntity, true)
-    
-    -- SetEntityDrawOutline entfernt, da es oft zu unsichtbaren Objekten führt!
     
     local heading = 0.0
     local zOffsetManual = 0.0
@@ -130,8 +122,8 @@ local function StartPlacement(itemKey)
 
         local finalX, finalY = targetX, targetY
         
-        -- EXAKTES BOUNDING-BOX GRID-SNAPPING
-        if Config.Placement.fenceSnapping then
+        -- RUST-STYLE GRID-SNAPPING
+        if Config.Placement.fenceSnapping and structDef.snapLength then
             local closestDist = Config.Placement.fenceSnapDistance
             local snapTarget = nil
             
@@ -150,20 +142,31 @@ local function StartPlacement(itemKey)
                 local rad = math.rad(targetHeading)
                 local forwardX = -math.sin(rad)
                 local forwardY = math.cos(rad)
+                local rightX = math.cos(rad)
+                local rightY = math.sin(rad)
                 
+                local L = structDef.snapLength
+                
+                -- Erkenne die echte Längsachse des 3D-Modells
                 local minDim, maxDim = GetModelDimensions(hash)
-                local frontEdge = maxDim.y
-                local backEdge = minDim.y 
-                local straightDist = frontEdge - backEdge
+                local lengthY = maxDim.y - minDim.y
+                local lengthX = maxDim.x - minDim.x
                 
-                local options = {
-                    { x = snapTarget.data.coords.x + (forwardX * straightDist), y = snapTarget.data.coords.y + (forwardY * straightDist), h = targetHeading },
-                    { x = snapTarget.data.coords.x - (forwardX * straightDist), y = snapTarget.data.coords.y - (forwardY * straightDist), h = targetHeading },
-                    { x = snapTarget.data.coords.x + (forwardX * frontEdge), y = snapTarget.data.coords.y + (forwardY * frontEdge), h = (targetHeading + 90.0) % 360.0 },
-                    { x = snapTarget.data.coords.x + (forwardX * frontEdge), y = snapTarget.data.coords.y + (forwardY * frontEdge), h = (targetHeading - 90.0) % 360.0 },
-                    { x = snapTarget.data.coords.x - (forwardX * frontEdge), y = snapTarget.data.coords.y - (forwardY * frontEdge), h = (targetHeading + 90.0) % 360.0 },
-                    { x = snapTarget.data.coords.x - (forwardX * frontEdge), y = snapTarget.data.coords.y - (forwardY * frontEdge), h = (targetHeading - 90.0) % 360.0 },
-                }
+                local options = {}
+                
+                if lengthY >= lengthX then
+                    -- Modell ist längs (Y-Achse) gebaut
+                    table.insert(options, { x = snapTarget.data.coords.x + (forwardX * L), y = snapTarget.data.coords.y + (forwardY * L), h = targetHeading })
+                    table.insert(options, { x = snapTarget.data.coords.x - (forwardX * L), y = snapTarget.data.coords.y - (forwardY * L), h = targetHeading })
+                    table.insert(options, { x = snapTarget.data.coords.x + (rightX * L), y = snapTarget.data.coords.y + (rightY * L), h = (targetHeading + 90.0) % 360.0 })
+                    table.insert(options, { x = snapTarget.data.coords.x - (rightX * L), y = snapTarget.data.coords.y - (rightY * L), h = (targetHeading + 90.0) % 360.0 })
+                else
+                    -- Modell ist quer (X-Achse) gebaut
+                    table.insert(options, { x = snapTarget.data.coords.x + (rightX * L), y = snapTarget.data.coords.y + (rightY * L), h = targetHeading })
+                    table.insert(options, { x = snapTarget.data.coords.x - (rightX * L), y = snapTarget.data.coords.y - (rightY * L), h = targetHeading })
+                    table.insert(options, { x = snapTarget.data.coords.x + (forwardX * L), y = snapTarget.data.coords.y + (forwardY * L), h = (targetHeading + 90.0) % 360.0 })
+                    table.insert(options, { x = snapTarget.data.coords.x - (forwardX * L), y = snapTarget.data.coords.y - (forwardY * L), h = (targetHeading + 90.0) % 360.0 })
+                end
                 
                 local bestOption = nil
                 local closestDistToAim = 999.0
@@ -189,11 +192,10 @@ local function StartPlacement(itemKey)
         SetEntityCoords(previewEntity, finalX, finalY, finalZ, false, false, false, false)
         SetEntityHeading(previewEntity, heading)
 
-        -- Einfache Farbbestätigung durch Transparenz
         if validSpot then
-            SetEntityAlpha(previewEntity, 200, false) -- Leicht sichtbar = gültig
+            SetEntityAlpha(previewEntity, 200, false)
         else
-            SetEntityAlpha(previewEntity, 100, false) -- Sehr transparent = ungültig
+            SetEntityAlpha(previewEntity, 100, false)
         end
 
         if IsDisabledControlPressed(0, 174) then 
@@ -271,10 +273,6 @@ function RotationToDirection(rotation)
     return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
 end
 
--- ===================================================================
--- EXPORTS & EVENTS (ox_inventory Fix)
--- ===================================================================
-
 local function parseItemKey(itemKey)
     if type(itemKey) == 'table' then
         return itemKey.name or itemKey[1]
@@ -283,14 +281,11 @@ local function parseItemKey(itemKey)
 end
 
 exports('startPlacing', function(itemKey)
-    local key = parseItemKey(itemKey)
-    print('[dv_base] Export startPlacing aufgerufen mit Key: ' .. tostring(key))
-    StartPlacement(key)
+    StartPlacement(parseItemKey(itemKey))
 end)
 
 RegisterNetEvent('dv_tentsystem:client:startPlacing', function(itemKey)
-    local key = parseItemKey(itemKey)
-    StartPlacement(key)
+    StartPlacement(parseItemKey(itemKey))
 end)
 
 -- ===================================================================
